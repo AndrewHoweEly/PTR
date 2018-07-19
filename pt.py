@@ -1,7 +1,19 @@
 import minisolvers
 # *p > -f
 
-        
+class RankedInterpretation:
+    def __init__(self):
+        self.layers = {}
+
+    def insert(vals,layer):
+        self.layers[layer]=vals
+    def inc_layer(vals,layer,inc):
+        start_layer = self.layers[layer]
+        for val in start_layer:
+            if val in vals:
+                layer.remove(val)
+                self.layers[layer+inc].append(val)
+    
 def conv_to_or(sentence):
     s = sentence.split(">")
     ant = s[0].strip()
