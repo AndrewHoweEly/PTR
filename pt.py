@@ -61,8 +61,28 @@ class Node():
         else:
             return self.left.inorder()+ self.value + self.right.inorder()
 
+    def get_vars(self):
+        var_list = []
+        if not self.value in var_list and self.value in "abcdefghijklmnopqrstuvwxyz":
+            var_list.append(self.value)
+        left_var_list = []
+        right_var_list = []
+        
+        if self.left:
+            left_var_list = self.left.get_vars()
+
+        if self.right:
+            right_var_list = self.right.get_vars()
+
+        for var in left_var_list + right_var_list:
+            if var not in var_list:
+                var_list.append(var)
+                
+        return var_list
+    
     def __str__(self):
         return self.value
+
 
 def create_tree(s):
     if "(" not in s:
@@ -137,6 +157,13 @@ def negate(node):
     return node
 
 
+def conv_impl(node):
+    # Return a sentence using | instead of >
+    node.value = "|"
+    node.right = negate(node.right)
+    return node
+
+
 def conv_to_or(sentence):
     # Return a representation containing | instead of >
     s = sentence.split(">")
@@ -145,7 +172,11 @@ def conv_to_or(sentence):
     new_sentence = "-" + ant + "|" + cons
     return new_sentence
 
-
+def conv_CNF_tree(node):
+    #
+    var_list = node.get_vars()
+    new_CNF = []
+    
 def conv_CNF(s):
     # Return a tuple containing array of clauses in CNF and the number of variables
     var_list = []
@@ -168,6 +199,21 @@ def conv_CNF(s):
         new_CNF.append(new_clause)
     return new_CNF, len(var_list)
 
+def get_model(kb):
+    # Return a model if a knowledge base is satisfiable
+    S = minisolvers.MinisatSolver()
+    cnf_tup = conv_CNF(kb)
+    clauses= cnf_tup[0]
+    no_var= cnf_tup[1]
+
+    for i in range(no_var):
+        S.new_var()
+        pass
+    for clause in clauses:
+        S.add_clause(clause)
+        pass
+    if S.solve():
+        return list(S.get_model())
 
 def check_satisfies(kb, val=""):
     # Return true if a knowledge base is satisfiable, option for valuation to check if satisfiable
@@ -188,6 +234,8 @@ def check_satisfies(kb, val=""):
 
 def check_entail(kb, s):
     # Return true if a sentence is entailed by a knowledge base
+    if ">" in s:
+        s = conv_to_or(s)
     s = negate(create_tree(s)).inorder()
     kb = kb + "&" + s
     return not check_satisfies(kb)
