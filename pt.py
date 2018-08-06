@@ -23,6 +23,13 @@ class RankedInterpretation:
                     start_layer.remove(val)
                     self.layers[layer+inc].append(val)
 
+    def find_layer(self, atom):
+        minm = 0
+        for layer in self.layers:
+            for val in layer:
+                if atom in layer:
+                    
+        
     def __str__(self):
         lines=[]
         for layer in self.layers:
@@ -131,7 +138,7 @@ def create_tree(s):
                     else:
                         new_node = Node(s[i+1])
                         new_node.left = create_tree(s[:i+1])
-                        new_node.right =create_tree(s[i+2:])
+                        new_node.right = create_tree(s[i+2:])
                     break
                 i+=1
                 
@@ -158,9 +165,16 @@ def negate(node):
 
 
 def conv_impl(node):
-    # Return a sentence using | instead of >
-    node.value = "|"
-    node.right = negate(node.right)
+    # Return a tree using | instead of >
+    if node == None:
+        return None
+    if node.value == ">":    
+        node.value = "|"
+        if node.left.value==">":
+            conv_impl(node.left)
+        node.left = negate(node.left)
+    conv_impl(node.left)
+    conv_impl(node.left)
     return node
 
 
@@ -172,10 +186,34 @@ def conv_to_or(sentence):
     new_sentence = "-" + ant + "|" + cons
     return new_sentence
 
+
+def create_clauses(node):
+    cur = []
+    if node.value=="&":
+        cur.append(create_clauses(node.left))
+        cur.append(create_clauses(node.right))
+    elif node.value=="|":
+        for child in node.left, node.right:
+            if child.value=="-":
+                cur.append("-"+child.left.value)
+            elif child.value in "abcdefghijklmnopqrstuvwxyz":
+                cur.append(child.value)
+            else:
+                cur += create_clauses(child)
+    elif node.value=="-":
+        cur.append("-"+node.left.value)
+    elif node.value in "abcdefghijklmnopqrstuvwxyz":
+        cur.append(node.value)
+    return cur
+
+
 def conv_CNF_tree(node):
     #
     var_list = node.get_vars()
     new_CNF = []
+    node = conv_impl(node)
+    
+    
     
 def conv_CNF(s):
     # Return a tuple containing array of clauses in CNF and the number of variables
@@ -231,6 +269,24 @@ def check_satisfies(kb, val=""):
         S.add_clause(clause)
         pass
     return S.solve()
+
+
+def check_satisfies_ranked(kb, val, rm):
+    # Return true if a valuation satisfies a KB wrt a ranked model
+    # kb an array of strings
+    for s in kb:
+        if not "*" in s:
+            if not check_satisfies(s, val):
+                return False
+        else:
+            typ_instances = [i for i, ch in enumerate(s) if ch=="*"]
+            for i in typ_instances:
+                print(i)
+                atom = s[i+1]
+                #find most typical layer of atom
+                lyr = rm.find_layer(atom)
+
+check_satisfies_ranked(["*a>b"],"1",1)
 
 def check_entail(kb, s):
     # Return true if a sentence is entailed by a knowledge base
