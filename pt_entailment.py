@@ -78,6 +78,14 @@ class Node():
         self.left = None
         self.right = None
 
+    def copy(self):
+        new_node = Node(self.value)
+        if self.left:
+            new_node.left = self.left.copy()
+        if self.right:
+            new_node.right = self.right.copy()
+        return new_node
+    
     def insert_left(self, left):
         self.left = left
 
@@ -158,8 +166,7 @@ def negate(node):
         node.left = negate(node.left)
         node.right = negate(node.right)
     elif node.value=="-":
-        node.value=node.left.value
-        node.left=None
+        node=node.left.copy()
     else:
         node.left = Node(node.value)
         node.value="-"
@@ -178,8 +185,16 @@ def conv_impl(node):
     conv_impl(node.right)
     return node
 
-
-
+def prop_neg(node):
+    # propagate a negation
+    if node==None:
+        return None
+    if node.value =="-" and node.left.value in "&|-":
+        node = negate(node.left)
+    node.left=prop_neg(node.left)
+    node.right=prop_neg(node.right)
+    return node
+        
 def fits_orOfAnd(node):
     # Check if a tree fits the situation of an Or of And
     if node.value == "|":
@@ -278,7 +293,7 @@ def create_tree(s):
 
 #############################
   # satisfaction
-def sat_kb(kb, val,var_list):
+def sat_kb(kb, val, var_list):
     # Check a valuation satisfies a classical KB
     # return true if val satisfies KB
     solver = minisolvers.MinisatSolver()
@@ -286,6 +301,7 @@ def sat_kb(kb, val,var_list):
     for i in range(len(kb)):
         tree = create_tree(kb[i])
         tree = conv_impl(tree)
+        tree = prop_neg(tree)
         tree = conv_orOfAnd(tree)
         new_kb[i]=tree.inorder()
     
@@ -298,7 +314,7 @@ def sat_kb(kb, val,var_list):
     val="&".join(val_s)
     new_kb.append(val)
     clauses = sat_format(new_kb,var_list)
-    #print('clauses',clauses)
+
     for i in range(len(var_list)):
         solver.new_var()
     for clause in clauses:
@@ -318,7 +334,9 @@ def sat_rm_val(kb, val, ranked_model,var_list):
                 
                 #find most typical layer of atom
                 lowest_layer = ranked_model.get_lowest_layer(var_list.index(atom))
+                
                 cur_layer = ranked_model.height(val)
+                
                 if cur_layer =="inf":
                     cur_layer=-1
                 if lowest_layer < cur_layer: # not the most typical world
@@ -335,7 +353,7 @@ def sat_kb_rm(kb, rm,var_list):
     # Check a ranked interpretation satisfies a KB
     for level in rm.layers:
         for val in level:
-            if not sat_rm_val(kb, val, rm,var_list):
+            if not sat_rm_val(kb, val, rm, var_list):
                 return False
     return True 
 
@@ -387,6 +405,7 @@ def pt_ranked(kb):
     # remove valuations that break classical statements
     classical_kb = [sentence for sentence in kb if not "*" in sentence]
     U = [val for val in U if sat_kb(classical_kb, val, var_list)]
+    #print(len(U))
     print('u',U)
     G = powerset(U)
     G.reverse()
@@ -399,16 +418,17 @@ def pt_ranked(kb):
                 X.append(subset)
             else:
                 break
-        #print("x",X)
+        #print("x",len(X))
         for s in X:
             #print('s',s)
             rankings = ["0"*len(s)]
             pt_min_s=[]
+            list_s=list(s)
             while pt_min_s == []:
                 for arr in rankings:
                     #try model
                     rm = RankedModel()
-                    rm.insert_vals(list(s),arr)
+                    rm.insert_vals(list_s,arr)
                     #print('arr',arr)
                     if sat_kb_rm(kb,rm,var_list):
                         #print(rm)
@@ -416,30 +436,109 @@ def pt_ranked(kb):
                 if rankings == incr_arrange(rankings):
                     break
                 rankings = incr_arrange(rankings)
+                if len(rankings)>1000:
+                    break
                 #print("len rankings",len(rankings))
+                #print(s)
             if pt_min_s==[]:
                 G.remove(s)#[x for x in G if not x==s]
             else:
-                G = [subset for subset in G if not s.issuperset(subset)]
+                G.remove(s)#G = [subset for subset in G if not s.issuperset(subset)]
+                for model in pt_min:
+                    if model.preferred(pt_min_s[0],U):
+                        pt_min_s = []
+                        break
             pt_min += pt_min_s
             #print('g',G)
     return pt_min
 
+rm=RankedModel()
+ab=list({'0010', '0100', '0000', '0101', '1100', '1001', '0111', '0011', '0001', '1101', '1000', '0110'})
+#print(ab)
+rm.insert_vals(ab,'010011100011')
+#print(rm)
+kb=["*b>f","e>-*f","e>-b","*f>w"]
+var_list = ['b','f','e','w']
+#print(sat_rm_val(kb, '0100', rm, var_list))
+#print(sat_kb_rm(["*b>f","e>-*f","e>-b","*f>w"],rm,['b','f','e','w']))
+
+
+def entail(s, val, var_list):
+    # return true if a statement is entailed by a valuation
+    solver = minisolvers.MinisatSolver()
+    s = create_tree(s)
+    s = conv_impl(s)
+    s = negate(s)
+    s = conv_orOfAnd(s)
+    s = s.inorder()
+    val_s = []
+    for i in range(len(val)):
+        if val[i] =="0":
+            val_s.append("-"+var_list[i])
+        else:
+            val_s.append(var_list[i])
+    val="&".join(val_s)
+    kb= [s] + [val]
+    #print(kb)
+    clauses = sat_format(kb,var_list)
+    #print('clauses',clauses)
+    for i in range(len(var_list)):
+        solver.new_var()
+    for clause in clauses:
+        solver.add_clause(clause)
+    return not solver.solve()
+
 def pt_entail(s, kb):
     # check if a statement is entailed by a ptl kb
-    ranked_model = pt_ranked(kb)
+    ranked_models = pt_ranked(kb)
     var_list = get_vars(kb)
-    # get most typical layer of atoms in s
+    for rm in ranked_models:
+        print(rm)
+            # check if classical statement
+        if "*" not in s:
+            for layer in rm.layers:
+                for val in layer:
+                    if not (entail(s,val,var_list)):
+                        return False
+        else:
+        #statement contains typicality
+            for layer in rm.layers:
+                for val in layer:
+                    layer_i = rm.height(val)
+                    new_s = s
+                    typ_instances = [j for j, ch in enumerate(new_s) if ch=="*"]
+
+                    while typ_instances!=[]:
+                        typ=typ_instances.pop()
+                        atom = s[typ+1]
+                        atom_index = var_list.index(atom)
+                        if val[atom_index] == "1":
+                            if rm.get_lowest_layer(atom_index) != layer_i:
+                                # this atom is not typical on this level
+                                # replace with unconditionally false
+                                new_s = new_s.replace("*"+atom,"("+atom+"&-"+atom+")")
+                            else:
+                                new_s = new_s.replace("*"+atom,atom)
+                        else:
+                            new_s=new_s.replace("*"+atom,atom)
+                        typ_instances=[j for j, ch in enumerate(new_s) if ch=="*"]
+                    if not entail(new_s, val, var_list):
+                        return False
+    return True
+                
+        # get most typical layer of atoms in s
     
-    #layer = ranked_model.get_lowest_layer()
+        #layer = ranked_model.get_lowest_layer()
 
-#x=["*t>(-p&-r)","t>(x|-x)","(x|-x)>t"]
-#y=["*p>*y","y>-f","-f>y","*r>*f"]
-for rm in pt_ranked(["p>b","*b>f"]):#"p>b","*b>f","*p>-f"]):
+x=["*t>(-p&-r)","t>(p|-p)","(p|-p)>t","*p>*y","y>-f","-f>y","*r>*f"]
+a=["*b>f","p>b"]
+#for rm in pt_ranked(["*b>f","e>-*f","e>-b","*f>w"]):
+ #   print('Ranked Model\n',rm)
+vals = ['10001', '10010', '10101', '10110', '11001', '11010', '11101', '11110']
+jj =  pt_ranked(x)
+for rm in jj:
     print('Ranked Model\n',rm)
-
-
-
+#print(pt_entail("e>w",["*b>f","e>-*f","e>-b","*f>w"]))
 #a = RankedModel()
 #b = RankedModel()
 
@@ -452,12 +551,9 @@ for rm in pt_ranked(["p>b","*b>f"]):#"p>b","*b>f","*p>-f"]):
 #print(a.preferred(b,v))
 
 
-
-
-
-
-
-
+#for rm in pt_ranked(["*b>f","*x>-f","x>(p&b)","(p&b)>x"]):
+#    print(rm)
+#print(pt_entail("*p>f",["p>b","*b>f","*p>-f"]))
 
 
 
