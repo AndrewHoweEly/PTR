@@ -1,8 +1,6 @@
 import minisolvers
 import re
 from itertools import chain, combinations, product
-import time
-import cProfile
 
 ############################
 
@@ -271,6 +269,7 @@ def conv_orOfAnd(node):
     return node
 
 def create_tree(s):
+    s = s.replace(" ","")
     if "(" not in s:
         if ">" in s:
             s = s.split(">")
@@ -615,23 +614,3 @@ def pt_entail(s, kb, ranked_models):
     return True
                 
 
-#testcases
-x=["(*(p|-p))>(-p&-ro)","*p>*-f","*ro>*f"]
-x1=["(*t)>(-p&-ro)","t>(p|-p)","(p|-p)>t","*p>*y","y>-f","-f>y","*ro>*f"]
-
-y = ["(*(p|-p))>(-p&-ro)","*p>-f","*ro>*f","p>-ro"]
-z = ["*birds>f","*p>-f","p>birds"]
-t0=time.time()
-pt =  pt_ranked(x1)
-t1=time.time()
-print(t1-t0)
-##
-##for rm in pt:
-##    print('Ranked Model\n',rm)
-#print(pt_entail("*-p>-ro",x))
-#cProfile.run('pt_ranked(z)')
-#print(create_tree(x[0]))
-##rm = RankedModel()
-##rm.insert_vals(["000","001"],"01")
-##print(rm.get_lowest_layer(2,True))
-##print(sat_kb_rm(x,rm,get_vars(x)))
