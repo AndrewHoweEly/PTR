@@ -1,6 +1,8 @@
 import minisolvers
 import re
 from itertools import chain, combinations, product
+import time
+import cProfile
 
 ############################
 
@@ -21,18 +23,31 @@ class RankedModel:
         for i in range(len(levels)):
             self.layers[int(levels[i])].append(vals[i])
 
-    def get_lowest_layer(self, atom_index):
-        i = 0
-        mini=1000
-        for layer in self.layers:
-            for val in layer:
-                if val[atom_index] == "1":
-                    if mini > i:
-                        mini = i
-            i += 1
-        if mini==1000:
-            return -1
-        return mini
+
+    def get_typical_layer_s(self, sentence, var_list):
+        #find lowest layer that satisfies a sentence
+        for i in range(len(self.layers)):
+            for val in self.layers[i]:
+                if sat_kb([sentence], val, var_list):
+                    return i
+        return "inf"
+
+                
+    def get_typical_layer_atom(self, atom_index, false_flag = False):
+        #find lowest layer 1 atom is satisfied on
+        # or if false flag lowest level not atom is satisfied on
+        # more efficient than using sat solver
+        if false_flag:
+            for i in range(len(self.layers)):
+                for val in self.layers[i]:
+                    if val[atom_index] == "0":
+                        return i
+        else:
+            for i in range(len(self.layers)):
+                for val in self.layers[i]:
+                    if val[atom_index] == "1":
+                        return i
+        return "inf"
 
     def height(self, v):
         #return the height of a valuation in the ranked intepretation
@@ -90,6 +105,29 @@ class Node():
             ret+= self.right.__str__(lvl+1)
         return ret
 
+    def find_typicality(self):
+        #return nodes with typicality children
+        typ = []
+        if self.left:
+            if self.left.value == "*":
+                typ.append(self)
+            typ+= self.left.find_typicality()
+
+        if self.right:
+            if self.right.value == "*":
+                typ.append(self)
+            typ+= self.right.find_typicality()
+            
+        return typ
+
+    def inorder_bra(self):
+        if self.left == None and self.right == None:
+            return self.value
+        elif self.right == None:
+            return self.value + self.left.inorder()
+        else:
+            return "("+self.left.inorder()+ self.value + self.right.inorder()+")"
+
     def inorder(self):
         if self.left == None and self.right == None:
             return self.value
@@ -121,10 +159,9 @@ def get_vars(kb):
     var_list = []
     for s in kb:
         atoms = re.split(">|&|\||-|\*|\(|\)",s)
-        var_list += [atom for atom in atoms if atom not in var_list and atom!=""]
-        #for ch in s:
-         #   if ch in "abcdefghijklmnopqrstuvwxyz" and ch not in var_list:
-          #      var_list.append(ch)
+        for atom in atoms:
+            if atom not in var_list and atom!="":
+                var_list.append(atom)
     return var_list
 
 def sat_format(kb,var_list):
@@ -141,7 +178,7 @@ def sat_format(kb,var_list):
                     new_clause.append(-(var_list.index(var.strip()[1:])+1))
                 except ValueError:
                     print(sent)
-                    print(var.strip()[1:])
+                    print("ValueError",var.strip()[1:])
             else:
                 new_clause.append(var_list.index(var.strip())+1)
         clauses.append(new_clause)
@@ -250,10 +287,14 @@ def create_tree(s):
             new_node = Node("&")
             new_node.left = create_tree(s[0])
             new_node.right = create_tree(s[1])
+        elif "*" in s:
+            s = s.split("*")
+            new_node = Node("*")
+            new_node.left = create_tree(s[1])
         elif "-" in s:
             s = s.split("-")
             new_node = Node("-")
-            new_node.left = create_tree(s[1])
+            new_node.left = create_tree(s[1])            
         else:
             new_node = Node(s)
 
@@ -261,8 +302,12 @@ def create_tree(s):
         new_node = Node("-")
         new_node.left = create_tree(s[1:])
 
+    elif s[0] == "*":
+        new_node = Node("*")
+        new_node.left = create_tree(s[1:])
+
     else:
-        if not ("-" in s or ">" in s or "|" in s or "&" in s):
+        if not ("-" in s or ">" in s or "|" in s or "&" in s or "*" in s):
             s = s.replace("(","")
             s = s.replace(")","")
             new_node = Node(s)
@@ -322,33 +367,66 @@ def sat_rm_val(kb, val, ranked_model, var_list):
     # Check a valuation satisfies a KB with typicality statements wrt a ranked model
     # return true if val satisfies 
     new_kb=[]
+    
+    for s in kb:
+        s_tree=create_tree(s)
+        typ_roots = s_tree.find_typicality()
+        if typ_roots:
+            for node in typ_roots:
+                if node.left.value=="*":
+                    #if typ is left child
+                    # Find lowest level node.left.left is satisfied on
+                    typ_sent = node.left.left.inorder_bra()
+                    if not (">" in typ_sent or "&" in typ_sent or "|" in typ_sent):
+                        if "-" in typ_sent:
+                            atom = node.left.left.left.inorder()
+                            lowest_layer = ranked_model.get_typical_layer_atom(var_list.index(atom),True)
+                        else:
+                            atom=node.left.left.inorder()
+                            lowest_layer = ranked_model.get_typical_layer_atom(var_list.index(atom))
+                    else:
+                        lowest_layer = ranked_model.get_typical_layer_s(typ_sent, var_list)
+                    cur_layer = ranked_model.height(val)
 
-    for s in kb:        
-        if "*" in s:
-            typ_instances = [j for j, ch in enumerate(s) if ch=="*"]
-            while typ_instances !=[]:
-                j = typ_instances.pop()
-                atom = re.match("[a-z]+",s[j+1:]).group()
-                
-                #find most typical layer of atom
-                lowest_layer = ranked_model.get_lowest_layer(var_list.index(atom))
-                cur_layer = ranked_model.height(val)
-                
-                if cur_layer =="inf":
-                    cur_layer=-1
-                if lowest_layer < cur_layer: # not the most typical world
-                    # replace typ instance with false
-                    s=s[:j]+s[j:j+len(atom)+1].replace("*"+atom,"("+atom+"&-"+atom+")")+s[j+1+len(atom):]
-                else: #most typical world, now evaluate on classical
-                    s=s[:j]+s[j:j+len(atom)+1].replace("*"+atom,atom)+s[j+1+len(atom):]
+                    if lowest_layer == "inf":
+                        lowest_layer = len(ranked_model.layers)
 
-                typ_instances = [j for j, ch in enumerate(s) if ch=="*"]
-                
-            new_kb.append(s)
+                    if lowest_layer < cur_layer:
+                        # val is not most typical world, replace with false
+                        node.left = create_tree("("+var_list[0]+"&"+"-"+var_list[0]+")")
+                    else:
+                        #typical world, evaluate classically
+                        node.left = node.left.left
+                else:
+                    #else typ must be right child
+                    # Find lowest level node.right.left is satisfied on
+                    typ_sent = node.right.left.inorder_bra()
+                    
+                    if not (">" in typ_sent or "&" in typ_sent or "|" in typ_sent):
+                        if "-" in typ_sent:
+                            atom=node.right.left.left.inorder()
+                            lowest_layer = ranked_model.get_typical_layer_atom(var_list.index(atom),True)
+                        else:
+                            atom=node.right.left.inorder()
+                            lowest_layer = ranked_model.get_typical_layer_atom(var_list.index(atom))                              
+                    else:
+                        lowest_layer = ranked_model.get_typical_layer_s(typ_sent, var_list)
+                    cur_layer = ranked_model.height(val)
+                    
+                    if lowest_layer == "inf":
+                        lowest_layer = len(ranked_model.layers)
+
+                    if lowest_layer < cur_layer:
+                        # val is not most typical world, replace with false
+                        node.right = create_tree("("+var_list[0]+"&"+"-"+var_list[0]+")")
+                    else:
+                        #typical world, evaluate classically
+                        node.right = node.right.left
+            new_kb.append(s_tree.inorder_bra())
         else:
             new_kb.append(s)
-        
-    return sat_kb(new_kb,val,var_list)
+    return sat_kb(new_kb, val, var_list)
+
 
 
 def sat_kb_rm(kb, rm, var_list):
@@ -414,6 +492,7 @@ def pt_ranked(kb):
     G = [list(subset) for subset in G if subset != set()]
     pt_min = [] # all minimal ranked models
     for subset in G:
+        #i+=1
         rankings = ["0"*len(subset)]
         pt_min_s=[]
         while pt_min_s == []:
@@ -421,7 +500,7 @@ def pt_ranked(kb):
                 #try model
                 rm = RankedModel()
                 rm.insert_vals(subset, arr)
-
+                #i+=1
                 if sat_kb_rm(kb, rm, var_list):
                     #if ranked model with current arrangement satisfies KB
                     pt_min_s.append(rm)
@@ -455,67 +534,104 @@ def entail(s, val, var_list):
             val_s.append(var_list[i])
     val="&".join(val_s)
     kb= [s] + [val]
-    #print(kb)
     clauses = sat_format(kb,var_list)
-    #print('clauses',clauses)
     for i in range(len(var_list)):
         solver.new_var()
     for clause in clauses:
         solver.add_clause(clause)
     return not solver.solve()
 
-def pt_entail(s, kb):
+def pt_entail(s, kb, ranked_models):
     # check if a statement is entailed by a ptl kb
-    ranked_models = pt_ranked(kb)
+    #ranked_models = pt_ranked(kb)
     var_list = get_vars(kb)
-    for rm in ranked_models:
+    for ranked_model in ranked_models:
         # check if classical statement
         if "*" not in s:
-            for layer in rm.layers:
+            for layer in ranked_model.layers:
                 for val in layer:
                     if not (entail(s,val,var_list)):
                         return False
         else:
         #statement contains typicality
-            for layer in rm.layers:
+            for layer in ranked_model.layers:
                 for val in layer:
-                    layer_i = rm.height(val)
-                    new_s = s
-                    typ_instances = [j for j, ch in enumerate(new_s) if ch=="*"]
-
-                    while typ_instances!=[]:
-                        typ=typ_instances.pop()
-                        atom = re.match("[a-z]+",new_s[typ+1:]).group()
-                        
-                        atom_index = var_list.index(atom)
-                        if val[atom_index] == "1":
-                            if rm.get_lowest_layer(atom_index) != layer_i:
-                                # this atom is not typical on this level
-                                # replace with unconditionally false
-                                new_s = new_s[:typ]+new_s[typ:typ+len(atom)+1].replace("*"+atom,"("+atom+"&-"+atom+")")+new_s[typ+1+len(atom):]
+                    s_tree=create_tree(s)
+                    typ_roots = s_tree.find_typicality()
+                    for node in typ_roots:
+                        if node.left.value=="*":
+                            #if typ is left child
+                            # Find lowest level node.left.left is satisfied on
+                            typ_sent = node.left.left.inorder_bra()
+                            if not (">" in typ_sent or "&" in typ_sent or "|" in typ_sent):
+                                if "-" in typ_sent:
+                                    atom=node.left.left.left.inorder()
+                                    lowest_layer = ranked_model.get_typical_layer_atom(var_list.index(atom),True)
+                                else:
+                                    atom=node.left.left.inorder()
+                                    lowest_layer = ranked_model.get_typical_layer_atom(var_list.index(atom))
                             else:
-                                new_s = new_s[:typ]+new_s[typ:typ+len(atom)+1].replace("*"+atom,atom)+new_s[typ+1+len(atom):]
+                                lowest_layer = ranked_model.get_typical_layer_s(typ_sent, var_list)
+                            cur_layer = ranked_model.height(val)
+
+                            if lowest_layer == "inf":
+                                lowest_layer = len(ranked_model.layers)
+
+                            if lowest_layer < cur_layer:
+                                # val is not most typical world, replace with false
+                                node.left = create_tree("("+var_list[0]+"&"+"-"+var_list[0]+")")
+                            else:
+                                #typical world, evaluate classically
+                                node.left = node.left.left
                         else:
-                            new_s = new_s[:typ]+new_s[typ:typ+len(atom)+1].replace("*"+atom,atom)+new_s[typ+1+len(atom):]
-                        
-                        typ_instances=[j for j, ch in enumerate(new_s) if ch=="*"]
-                    if not entail(new_s, val, var_list):
+                            #else typ must be right child
+                            # Find lowest level node.right.left is satisfied on
+                            typ_sent = node.right.left.inorder_bra()
+                            if not (">" in typ_sent or "&" in typ_sent or "|" in typ_sent):
+                                if "-" in typ_sent:
+                                    atom=node.right.left.left.inorder()
+                                    lowest_layer = ranked_model.get_typical_layer_atom(var_list.index(atom),True)
+                                else:
+                                    atom=node.right.left.inorder()
+                                    lowest_layer = ranked_model.get_typical_layer_atom(var_list.index(atom))
+
+                            else:
+                                lowest_layer = ranked_model.get_typical_layer_s(typ_sent, var_list)
+                            cur_layer = ranked_model.height(val)
+                            
+                            if lowest_layer == "inf":
+                                lowest_layer = len(ranked_model.layers)
+
+                            if lowest_layer < cur_layer:
+                                # val is not most typical world, replace with false
+                                node.right = create_tree("("+var_list[0]+"&"+"-"+var_list[0]+")")
+                            else:
+                                #typical world, evaluate classically
+                                node.right = node.right.left
+                    new_s = s_tree.inorder_bra()
+                    if not sat_kb([new_s],val,var_list):
                         return False
+                    
     return True
                 
 
 #testcases
-x=["*t>(-p&-ro)","t>(p|-p)","(p|-p)>t","*p>*y","y>-f","-f>y","*ro>*f"]
-y = ["*t>(-p&-ro)","t>(p|-p)","(p|-p)>t","*p>-f","*ro>*f","p>-ro"]
+x=["(*(p|-p))>(-p&-ro)","*p>*-f","*ro>*f"]
+x1=["(*t)>(-p&-ro)","t>(p|-p)","(p|-p)>t","*p>*y","y>-f","-f>y","*ro>*f"]
+
+y = ["(*(p|-p))>(-p&-ro)","*p>-f","*ro>*f","p>-ro"]
 z = ["*birds>f","*p>-f","p>birds"]
-#
-#for rm in pt:
-#    print('Ranked Model\n',rm)
-#print(pt_entail("p>birds",z))
-
-pt =  pt_ranked(z)
-
-
-
-
-
+t0=time.time()
+pt =  pt_ranked(x1)
+t1=time.time()
+print(t1-t0)
+##
+##for rm in pt:
+##    print('Ranked Model\n',rm)
+#print(pt_entail("*-p>-ro",x))
+#cProfile.run('pt_ranked(z)')
+#print(create_tree(x[0]))
+##rm = RankedModel()
+##rm.insert_vals(["000","001"],"01")
+##print(rm.get_lowest_layer(2,True))
+##print(sat_kb_rm(x,rm,get_vars(x)))
