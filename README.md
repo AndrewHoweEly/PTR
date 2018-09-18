@@ -15,7 +15,7 @@ Run demo.py
 
 An example PTL Knowledge base to use is:
 
-"(\*(p|\-p))\>(\-p&\-r)", "\*p\>\*\-f", "\*r\>\*f"
+\["(\*(p|\-p))\>(\-p&\-r)", "\*p\>\*\-f", "\*r\>\*f"\]
 
 
 
