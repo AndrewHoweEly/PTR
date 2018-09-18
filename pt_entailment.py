@@ -503,16 +503,17 @@ def pt_ranked(kb):
                 if sat_kb_rm(kb, rm, var_list):
                     #if ranked model with current arrangement satisfies KB
                     pt_min_s.append(rm)
-                    for model in pt_min:
-                        if model.preferred(rm, U):
-                            pt_min_s.pop()
-                            break
 
             rankings = incr_arrange(rankings)
             if rankings == []:
                 break
             if len(rankings)>1000:
                 break
+        for model in pt_min:
+            for i in range(len(pt_min_s)):
+                model2 = pt_min_s[i]
+                if model.preferred(model2,U):
+                    pt_min_s.remove(model2)
         pt_min += pt_min_s
     return pt_min
 
