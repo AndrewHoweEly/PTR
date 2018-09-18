@@ -1,3 +1,12 @@
+"""A Python Module to compute PT Minimal Models and PT Entailment
+
+Classes:
+    RankedModel
+     Represent a ranked interpretation holding valuations on different levels
+    Node
+     Binary formula tree for propositional sentences
+"""
+
 import minisolvers
 import re
 from itertools import chain, combinations, product
@@ -5,6 +14,12 @@ from itertools import chain, combinations, product
 ############################
 
 class RankedModel:
+    """The RankedModel class represents a ranked interpretation or model
+    holding valuations.
+    It provides methods to find information on typicality of sentences and
+    preferred models.
+    """
+    
     def __init__(self):
         self.layers = []
 
@@ -14,6 +29,7 @@ class RankedModel:
         return rm
 
     def insert_vals(self, vals, levels=-1):
+        # Insert a list of valuations into a ranked model using the arrangement levels
         if levels==-1:
             levels="0"*len(vals)
         for x in range(len(set(levels))):
@@ -32,9 +48,8 @@ class RankedModel:
 
                 
     def get_typical_layer_atom(self, atom_index, false_flag = False):
-        #find lowest layer 1 atom is satisfied on
+        # find lowest layer 1 atom is satisfied on
         # or if false flag lowest level not atom is satisfied on
-        # more efficient than using sat solver
         if false_flag:
             for i in range(len(self.layers)):
                 for val in self.layers[i]:
@@ -75,7 +90,8 @@ class RankedModel:
         return string
 
 class Node():
-    # Tree representation of propositional formula
+    """ Tree representation of propositional formula
+    """
     def __init__(self, value):
         self.value = value
         self.left = None
@@ -95,14 +111,6 @@ class Node():
     def insert_right(self, right):
         self.right = right
 
-    def __str__(self, lvl=0):
-        ret = " "*lvl + self.value + "\n"
-        if self.left:
-            ret += self.left.__str__(lvl+1)
-        if self.right:
-            ret+= self.right.__str__(lvl+1)
-        return ret
-
     def find_typicality(self):
         #return nodes with typicality children
         typ = []
@@ -119,12 +127,13 @@ class Node():
         return typ
 
     def inorder_bra(self):
+        # return inorder string with brackets
         if self.left == None and self.right == None:
             return self.value
         elif self.right == None:
             return self.value + self.left.inorder()
         else:
-            return "("+self.left.inorder()+ self.value + self.right.inorder()+")"
+            return "("+self.left.inorder_bra()+ self.value + self.right.inorder_bra()+")"
 
     def inorder(self):
         if self.left == None and self.right == None:
@@ -133,11 +142,19 @@ class Node():
             return self.value + self.left.inorder()
         else:
             return self.left.inorder()+ self.value + self.right.inorder()
+        
+    def __str__(self, lvl=0):
+        ret = " "*lvl + self.value + "\n"
+        if self.left:
+            ret += self.left.__str__(lvl+1)
+        if self.right:
+            ret+= self.right.__str__(lvl+1)
+        return ret
 
 ############################
         # Pre-processing
 def add_brackets(s):
-    # TODO: precedence ? :-, &, |, >
+    # Adds brackets from associatively right to left
     s = s.replace(" ","")
     atoms = re.split(">|&|\|",s)
     ops = re.split("\*|-*[a-z]",s)
@@ -269,6 +286,7 @@ def conv_orOfAnd(node):
     return node
 
 def create_tree(s):
+    # create a formula tree from a sentence
     s = s.replace(" ","")
     if "(" not in s:
         if ">" in s:

@@ -9,5 +9,14 @@ First compile the PyMiniSolvers Library:
 
 2. Build the shared libraries with $ make
 
-Now place the PT-Entail folder in the same folder
+Now place pt_entailment.py and demo.py in the same folder 
+
+Run demo.py
+
+An example PTL Knowledge base to use is:
+
+"(\*(p|\-p))\>(\-p&\-r)", "\*p\>\*\-f", "\*r\>\*f"
+
+
+
 
