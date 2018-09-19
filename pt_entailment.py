@@ -336,13 +336,11 @@ def create_tree(s):
                 new_node.right = create_tree(s_list[1])
 
         elif s.startswith("*"):
-            s_list = s.split("*")
             new_node = Node("*")
-            new_node.left = create_tree(s_list[1])
+            new_node.left = create_tree(s[1:])
         elif s.startswith("-"):
-            s_list = s.split("-")
             new_node = Node("-")
-            new_node.left = create_tree(s_list[1])            
+            new_node.left = create_tree(s[1:])            
         else :
             new_node = Node(s)
 
@@ -362,13 +360,11 @@ def create_tree(s):
                 if counter == 0:
                     if len(s) <= i+1:
                         if s.startswith("*"):
-                            s_list = s.split("*")
                             new_node = Node("*")
-                            new_node.left = create_tree(s_list[1])
+                            new_node.left = create_tree(s[1:])
                         elif s.startswith("-"):
-                            s_list = s.split("-")
                             new_node = Node("-")
-                            new_node.left = create_tree(s_list[1])
+                            new_node.left = create_tree(s[1:])
                         else:
                             new_node = create_tree(s[1:len(s)-1])
                         break
@@ -677,8 +673,6 @@ def pt_entail(s, kb, ranked_models):
                                 node.right = node.right.left
                     new_s = s_tree.inorder_bra()
                     if not sat_kb([new_s],val,var_list):
-                        print(val)
-                        print(new_s)
                         return False
                     
     return True
