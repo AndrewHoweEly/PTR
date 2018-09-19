@@ -204,8 +204,7 @@ def sat_format(kb,var_list):
                 try:
                     new_clause.append(-(var_list.index(var.strip()[1:])+1))
                 except ValueError:
-                    print(sent)
-                    print("ValueError",var.strip()[1:])
+                    print("Error: statement not properly formatted")
             else:
                 new_clause.append(var_list.index(var.strip())+1)
         clauses.append(new_clause)
@@ -518,17 +517,18 @@ def incr_arrange(rankings):
     return [rank for rank in list(temp) if valid_intr(rank)]
 
 
-def pt_ranked(kb):
+def pt_ranked(kb, bound=0):
     """ Returns the set of minimal ranked models for typicality KB
         This is the main algorithm the project is concerned with
+        Optional argument bound to skip if arrangements > bound
     """
     var_list = get_vars(kb)
-    print(var_list)
+    #print(var_list)
     U = ["".join(seq) for seq in product("01", repeat=len(var_list))] #every possible valuation
     # remove valuations that dn satisfy classical statements
     classical_kb = [sentence for sentence in kb if not "*" in sentence]
     U = [val for val in U if sat_kb(classical_kb, val, var_list)]
-    print('U',U)
+    #print('U',U)
 
     G = powerset(U)
     G.reverse()
@@ -553,8 +553,8 @@ def pt_ranked(kb):
             if rankings == []:
                 break
             # cheap optimisation trick to skip arrangements
-            #if len(rankings)>1000:
-            #    break
+            if bound>0 and len(rankings)>bound:
+                break
         for model in pt_min:
             for i in range(len(pt_min_s)):
                 model2 = pt_min_s[i]

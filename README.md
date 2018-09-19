@@ -20,7 +20,7 @@ An example PTL Knowledge base to use is:
 \["(\*(p|\-p))\>(\-p&\-r)", "\*p\>\*\-f", "\*r\>\*f"\]
 
 From this you can entail "(\*\-p)\>(\-r)"
-but not "(\*(\-p&f)\>(\-r))" or "(\*\-p)\>(\-f)"
+but not "(\*(\-p&f))\>(\-r)" or "(\*\-p)\>(\-f)"
 
 
 
