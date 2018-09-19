@@ -29,7 +29,8 @@ class RankedModel:
         return rm
 
     def insert_vals(self, vals, levels=-1):
-        # Insert a list of valuations into a ranked model using the arrangement levels
+        """ Insert a list of valuations into RankedModel using the arrangement levels
+        """
         if levels==-1:
             levels="0"*len(vals)
         for x in range(len(set(levels))):
@@ -39,7 +40,8 @@ class RankedModel:
 
 
     def get_typical_layer_s(self, sentence, var_list):
-        #find lowest layer that satisfies a sentence
+        """ Return lowest layer that satisfies a sentence
+        """
         for i in range(len(self.layers)):
             for val in self.layers[i]:
                 if sat_kb([sentence], val, var_list):
@@ -48,8 +50,9 @@ class RankedModel:
 
                 
     def get_typical_layer_atom(self, atom_index, false_flag = False):
-        # find lowest layer 1 atom is satisfied on
-        # or if false flag lowest level not atom is satisfied on
+        """ Return lowest layer 1 atom is satisfied on
+        or if false flag lowest level not atom is satisfied on
+        """
         if false_flag:
             for i in range(len(self.layers)):
                 for val in self.layers[i]:
@@ -63,7 +66,8 @@ class RankedModel:
         return "inf"
 
     def height(self, v):
-        #return the height of a valuation in the ranked intepretation
+        """ Return the height of a valuation in the ranked intepretation
+        """
         for i in range(len(self.layers)):
             for val in self.layers[i]:
                 if val==v:
@@ -71,7 +75,8 @@ class RankedModel:
         return "inf"
 
     def preferred(self, rm_2, vals):
-        # return true if current RM is =< RM2
+        """Return true if current RM is =<PT RM2
+        """
         for val in vals:
             h1 = self.height(val)
             h2 = rm_2.height(val)
@@ -112,7 +117,8 @@ class Node():
         self.right = right
 
     def find_typicality(self):
-        #return nodes with typicality children
+        """Return nodes with typicality children
+        """
         typ = []
         if self.left:
             if self.left.value == "*":
@@ -127,7 +133,8 @@ class Node():
         return typ
 
     def inorder_bra(self):
-        # return inorder string with brackets
+        """ Return inorder string with brackets
+        """
         if self.left == None and self.right == None:
             return self.value
         elif self.right == None:
@@ -136,6 +143,8 @@ class Node():
             return "("+self.left.inorder_bra()+ self.value + self.right.inorder_bra()+")"
 
     def inorder(self):
+        """ Return inorder string of nodes
+        """
         if self.left == None and self.right == None:
             return self.value
         elif self.right == None:
@@ -154,7 +163,8 @@ class Node():
 ############################
         # Pre-processing
 def add_brackets(s):
-    # Adds brackets from associatively right to left
+    """ Return string with brackets associatively right to left
+    """
     s = s.replace(" ","")
     atoms = re.split(">|&|\|",s)
     ops = re.split("\*|-*[a-z]",s)
@@ -170,7 +180,8 @@ def add_brackets(s):
     return s
 
 def get_vars(kb):
-    # Return a list of variables
+    """ Return a list of atoms used in KB
+    """
     var_list = []
     for s in kb:
         atoms = re.split(">|&|\||-|\*|\(|\)",s)
@@ -180,7 +191,8 @@ def get_vars(kb):
     return var_list
 
 def sat_format(kb,var_list):
-    # return a list of SAT clauses
+    """ Return a list of SAT clauses
+    """
     s = "&".join(kb)
     clauses = []
     ors = s.split("&")
@@ -203,7 +215,8 @@ def sat_format(kb,var_list):
 ############################
     #tree operations
 def negate(node):
-    # Return the negation of a statement
+    """ Return the negation of a statement
+    """
     if node.value=="&":
         node.value= "|"
         node.left = negate(node.left)
@@ -220,7 +233,8 @@ def negate(node):
     return node
 
 def conv_impl(node):
-    # Return a tree using | instead of >
+    """ Return a tree using | instead of >
+    """
     if node == None:
         return None
     if node.value == ">":    
@@ -233,7 +247,8 @@ def conv_impl(node):
     return node
 
 def prop_neg(node):
-    # propagate a negation
+    """ Return formula tree with propagation of negations
+    """
     if node==None:
         return None
     if node.value =="-" and node.left.value in "&|-":
@@ -243,7 +258,8 @@ def prop_neg(node):
     return node
         
 def fits_orOfAnd(node):
-    # Check if a tree fits the situation of an Or of And
+    """ Return true if a formula tree fits the situation of an Or of And
+    """
     if node.value == "|":
         if node.left.value == "&":
             return True
@@ -255,8 +271,9 @@ def fits_orOfAnd(node):
 
 
 def conv_orOfAnd(node):
-    #If a formula tree matches that of (A and B) or C convert to
-    # (A or C) and (B or C) to be in CNF
+    """ Return a formula tree. Find nodes that match that of "(A and B) or C"
+    convert to "(A or C) and (B or C)" to be in CNF
+    """
     if fits_orOfAnd(node):
         node.value="&"
         if node.left.value=="&":
@@ -286,7 +303,8 @@ def conv_orOfAnd(node):
     return node
 
 def create_tree(s):
-    # create a formula tree from a sentence
+    """ Return a formula tree from a sentence
+    """
     s = s.replace(" ","")
     if "(" not in s:
         if ">" in s:
@@ -353,8 +371,9 @@ def create_tree(s):
 #############################
   # satisfaction
 def sat_kb(kb, val, var_list):
-    # Check a valuation satisfies a classical KB
-    # return true if val satisfies KB
+    """ Check a valuation satisfies a classical KB
+     return true if val satisfies KB
+    """
     solver = minisolvers.MinisatSolver()
     new_kb = kb.copy()
     for i in range(len(kb)):
@@ -381,8 +400,9 @@ def sat_kb(kb, val, var_list):
     return solver.solve()
 
 def sat_rm_val(kb, val, ranked_model, var_list):
-    # Check a valuation satisfies a KB with typicality statements wrt a ranked model
-    # return true if val satisfies 
+    """Check a valuation satisfies a KB with typicality statements wrt a ranked model
+     return true if val satisfies
+    """
     new_kb=[]
     
     for s in kb:
@@ -447,7 +467,8 @@ def sat_rm_val(kb, val, ranked_model, var_list):
 
 
 def sat_kb_rm(kb, rm, var_list):
-    # Check a ranked interpretation satisfies a KB
+    """ Return true if a ranked interpretation satisfies a KB
+    """
     for level in rm.layers:
         for val in level:
             if not sat_rm_val(kb, val, rm, var_list):
@@ -455,8 +476,10 @@ def sat_kb_rm(kb, rm, var_list):
     return True 
 
 #algorithm helper functions
+
 def powerset(s):
-    # return a list of subsets as set type
+    """ Return a list of subsets as set type
+    """
     result = []
     for length in range(len(s)+1):
         for subset in combinations(s,length):
@@ -464,9 +487,10 @@ def powerset(s):
     return result
             
 def valid_intr(ranking):
-    # check if string ranking is a valid interpretation,
-    # no valuation should be >1 level above the others
-    # valuations should not be all on same level if lvl >1
+    """ Method to check if string ranking is a valid interpretation,
+    no valuation should be >1 level above the others
+    valuations should not be all on same level if lvl >1
+    """
     if len(ranking)==1:
         if ranking=="0":
             return True
@@ -483,19 +507,21 @@ def valid_intr(ranking):
     return True
 
 def incr_arrange(rankings):
-    # return a list of ranking arrangements but all incremented by 1 level
+    """ Returns a list of unique arrangements all incremented by 1 level
+    """
     temp = set()
     for a in rankings:
         for i in range(len(a)):
             temp_rank = list(a)
             temp_rank[i] = str(int(temp_rank[i])+1)
             temp.add("".join(temp_rank))
-        #print(temp)
     return [rank for rank in list(temp) if valid_intr(rank)]
 
 
 def pt_ranked(kb):
-    #return set of minimal ranked models for typicality KB
+    """ Returns the set of minimal ranked models for typicality KB
+        This is the main algorithm the project is concerned with
+    """
     var_list = get_vars(kb)
     print(var_list)
     U = ["".join(seq) for seq in product("01", repeat=len(var_list))] #every possible valuation
@@ -523,10 +549,12 @@ def pt_ranked(kb):
                     pt_min_s.append(rm)
 
             rankings = incr_arrange(rankings)
+            
             if rankings == []:
                 break
-            if len(rankings)>1000:
-                break
+            # cheap optimisation trick to skip arrangements
+            #if len(rankings)>1000:
+            #    break
         for model in pt_min:
             for i in range(len(pt_min_s)):
                 model2 = pt_min_s[i]
@@ -537,7 +565,8 @@ def pt_ranked(kb):
 
 
 def entail(s, val, var_list):
-    # return true if a statement is entailed by a valuation
+    """ Returns true if a statement is entailed by a valuation
+    """
     solver = minisolvers.MinisatSolver()
     s = create_tree(s)
     s = conv_impl(s)
@@ -560,7 +589,9 @@ def entail(s, val, var_list):
     return not solver.solve()
 
 def pt_entail(s, kb, ranked_models):
-    # check if a statement is entailed by a ptl kb
+    """ Returns true if a statement is entailed by a PTL KB
+        input statement, knowledge base, and the minimal models from pt_ranked
+    """
     #ranked_models = pt_ranked(kb)
     var_list = get_vars(kb)
     for ranked_model in ranked_models:
