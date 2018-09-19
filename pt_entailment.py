@@ -138,7 +138,7 @@ class Node():
         if self.left == None and self.right == None:
             return self.value
         elif self.right == None:
-            return self.value + self.left.inorder()
+            return self.value + "("+self.left.inorder()+")"
         else:
             return "("+self.left.inorder_bra()+ self.value + self.right.inorder_bra()+")"
 
@@ -306,45 +306,51 @@ def create_tree(s):
     """
     s = s.replace(" ","")
     if "(" not in s:
-        if ">" in s:
-            s = s.split(">")
-            new_node = Node(">")
-            new_node.left = create_tree(s[0])
-            new_node.right = create_tree(s[1])
+        if "&" in s:
+            s_list = s.split("&")
+            if len(s_list)>2:
+                s=add_brackets(s)
+                new_node = create_tree(s)
+            else:
+                new_node = Node("&")
+                new_node.left = create_tree(s_list[0])
+                new_node.right = create_tree(s_list[1])
+
         elif "|" in s:
-            s = s.split("|")
-            new_node = Node("|")
-            new_node.left = create_tree(s[0])
-            new_node.right = create_tree(s[1])
-        elif "&" in s:
-            s = s.split("&")
-            new_node = Node("&")
-            new_node.left = create_tree(s[0])
-            new_node.right = create_tree(s[1])
-        elif "*" in s:
-            s = s.split("*")
+            s_list = s.split("|")
+            if len(s_list)>2:
+                s=add_brackets(s)
+                new_node = create_tree(s)
+            else:
+                new_node = Node("|")
+                new_node.left = create_tree(s_list[0])
+                new_node.right = create_tree(s_list[1])
+        elif ">" in s:
+            s_list = s.split(">")
+            if len(s_list)>2:
+                s=add_brackets(s)
+                new_node = create_tree(s)
+            else:
+                new_node = Node(">")
+                new_node.left = create_tree(s_list[0])
+                new_node.right = create_tree(s_list[1])
+
+        elif s.startswith("*"):
+            s_list = s.split("*")
             new_node = Node("*")
-            new_node.left = create_tree(s[1])
-        elif "-" in s:
-            s = s.split("-")
+            new_node.left = create_tree(s_list[1])
+        elif s.startswith("-"):
+            s_list = s.split("-")
             new_node = Node("-")
-            new_node.left = create_tree(s[1])            
-        else:
+            new_node.left = create_tree(s_list[1])            
+        else :
             new_node = Node(s)
-
-    elif s[0] == "-":
-        new_node = Node("-")
-        new_node.left = create_tree(s[1:])
-
-    elif s[0] == "*":
-        new_node = Node("*")
-        new_node.left = create_tree(s[1:])
 
     else:
-        if not ("-" in s or ">" in s or "|" in s or "&" in s or "*" in s):
+        if not (">" in s or "|" in s or "&" in s):
             s = s.replace("(","")
             s = s.replace(")","")
-            new_node = Node(s)
+            new_node = create_tree(s)
         else:
             counter = 0
             i=0
@@ -355,7 +361,16 @@ def create_tree(s):
                     counter-=1
                 if counter == 0:
                     if len(s) <= i+1:
-                        new_node = create_tree(s[1:len(s)-1])
+                        if s.startswith("*"):
+                            s_list = s.split("*")
+                            new_node = Node("*")
+                            new_node.left = create_tree(s_list[1])
+                        elif s.startswith("-"):
+                            s_list = s.split("-")
+                            new_node = Node("-")
+                            new_node.left = create_tree(s_list[1])
+                        else:
+                            new_node = create_tree(s[1:len(s)-1])
                         break
                     elif s[i+1] in ">&|":
                         new_node = Node(s[i+1])
@@ -364,7 +379,10 @@ def create_tree(s):
                         break
                 i+=1
 
-    return new_node
+    try:
+        return new_node
+    except UnboundLocalError:
+        print("Error: invalid sentence.")
 
 
 #############################
@@ -659,6 +677,8 @@ def pt_entail(s, kb, ranked_models):
                                 node.right = node.right.left
                     new_s = s_tree.inorder_bra()
                     if not sat_kb([new_s],val,var_list):
+                        print(val)
+                        print(new_s)
                         return False
                     
     return True
